@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package eventsauce.api.v1;
+
+import "google/protobuf/timestamp.proto";
+
+enum QueryOperator {
+    QUERY_OPERATOR_LESS_THAN_OR_EQUAL = 0;
+    QUERY_OPERATOR_LATEST = 1;
+}
+
+enum QuerySorting {
+    QUERY_VERSION = 0;
+    QUERY_NATURAL_TIMESTAMP = 1;
+}
+
+message Query {
+    
+    int64 version = 1;
+    google.protobuf.Timestamp natural_timestamp = 2;
+    QueryOperator operator = 3;
+    QuerySorting sorting = 4;
+
+}

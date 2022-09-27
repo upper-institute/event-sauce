@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+
+  redis:
+    image: redis:7-bullseye
+    ports:
+      - 6379:6379
+
+  paprika:
+    image: paprika
+    ports:
+      - 6336:6336
+    command:
+      - paprika
+      - redis
+      - --listenAddr=0.0.0.0:6336
+      - --redisShards=redis:6379
+
+  storeadmin:
+    image: fullstorydev/grpcui
+    ports:
+      - 58080:8080
+    command:
+      - -plaintext
+      - -use-reflection
+      - paprika:6336

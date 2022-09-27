@@ -1,5 +1,0 @@
-syntax = "proto3";
-
-package eventsauce.api.v1;
-
-import "google/protobuf/timestamp.proto";
