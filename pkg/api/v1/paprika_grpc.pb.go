@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -22,7 +23,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PaprikaServiceClient interface {
-	Set(ctx context.Context, in *Snapshot, opts ...grpc.CallOption) (*Snapshot_SetResponse, error)
+	Set(ctx context.Context, in *Snapshot, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Get(ctx context.Context, in *Snapshot_GetRequest, opts ...grpc.CallOption) (*Snapshot, error)
 }
 
@@ -34,8 +35,8 @@ func NewPaprikaServiceClient(cc grpc.ClientConnInterface) PaprikaServiceClient {
 	return &paprikaServiceClient{cc}
 }
 
-func (c *paprikaServiceClient) Set(ctx context.Context, in *Snapshot, opts ...grpc.CallOption) (*Snapshot_SetResponse, error) {
-	out := new(Snapshot_SetResponse)
+func (c *paprikaServiceClient) Set(ctx context.Context, in *Snapshot, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/eventsauce.api.v1.PaprikaService/Set", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -56,7 +57,7 @@ func (c *paprikaServiceClient) Get(ctx context.Context, in *Snapshot_GetRequest,
 // All implementations must embed UnimplementedPaprikaServiceServer
 // for forward compatibility
 type PaprikaServiceServer interface {
-	Set(context.Context, *Snapshot) (*Snapshot_SetResponse, error)
+	Set(context.Context, *Snapshot) (*emptypb.Empty, error)
 	Get(context.Context, *Snapshot_GetRequest) (*Snapshot, error)
 	mustEmbedUnimplementedPaprikaServiceServer()
 }
@@ -65,7 +66,7 @@ type PaprikaServiceServer interface {
 type UnimplementedPaprikaServiceServer struct {
 }
 
-func (UnimplementedPaprikaServiceServer) Set(context.Context, *Snapshot) (*Snapshot_SetResponse, error) {
+func (UnimplementedPaprikaServiceServer) Set(context.Context, *Snapshot) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Set not implemented")
 }
 func (UnimplementedPaprikaServiceServer) Get(context.Context, *Snapshot_GetRequest) (*Snapshot, error) {

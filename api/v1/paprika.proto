@@ -3,12 +3,14 @@ syntax = "proto3";
 package eventsauce.api.v1;
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/any.proto";
+import "google/protobuf/empty.proto";
 
 message Snapshot {
 
     string id = 1;
-    string version = 2;
+    int64 version = 2;
     google.protobuf.Timestamp natural_timestamp = 3;
     google.protobuf.Timestamp store_timestamp = 4;
 
@@ -16,9 +18,7 @@ message Snapshot {
 
     google.protobuf.Any payload = 6;
 
-    message SetResponse {
-        Snapshot snapshot = 1;
-    }
+    google.protobuf.Duration ttl = 7;
 
     message GetRequest {
         string id = 1;
@@ -27,6 +27,6 @@ message Snapshot {
 }
 
 service PaprikaService {
-    rpc Set(Snapshot) returns (Snapshot.SetResponse) {}
+    rpc Set(Snapshot) returns (google.protobuf.Empty) {}
     rpc Get(Snapshot.GetRequest) returns (Snapshot) {}
 }

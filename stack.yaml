@@ -17,10 +17,10 @@ services:
       - --listenAddr=0.0.0.0:6336
       - --redisShards=redis:6379
 
-  storeadmin:
+  grpcui:
     image: fullstorydev/grpcui
     ports:
-      - 58080:8080
+      - 16336:8080
     command:
       - -plaintext
       - -use-reflection
