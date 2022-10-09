@@ -1,4 +1,4 @@
-package cmd
+package flipbook
 
 import (
 	"crypto/tls"
@@ -9,12 +9,15 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/upper-institute/event-sauce/internal/eventstore"
+	"github.com/upper-institute/event-sauce/internal/snapshotstore"
+	apiv1 "github.com/upper-institute/event-sauce/pkg/api/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
 )
 
-const rootCmdUse = "paprika"
+const rootCmdUse = "flipbook"
 
 var (
 	cfgFile string
@@ -27,9 +30,12 @@ var (
 	grpcServerListener net.Listener
 	grpcServer         *grpc.Server
 
+	eventStoreService    = &eventstore.EventStoreServer{}
+	snapshotStoreService = &snapshotstore.SnapshotStoreServer{}
+
 	rootCmd = &cobra.Command{
 		Use:   rootCmdUse,
-		Short: "EventSauce - Paprika snapshot store",
+		Short: "EventSauce - Snapshot store",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 
 			opts := []grpc.ServerOption{}
@@ -38,7 +44,7 @@ var (
 
 				cert, err := tls.LoadX509KeyPair(tlsCert, tlsKey)
 				if err != nil {
-					log.Fatalln("Failed load TLS certificate (", tlsCert, ") or key (", tlsKey, ") because", err)
+					log.Fatalln("failed load TLS certificate (", tlsCert, ") or key (", tlsKey, ") because", err)
 				}
 
 				config := &tls.Config{
@@ -52,7 +58,7 @@ var (
 
 			lis, err := net.Listen("tcp", listenAddr)
 			if err != nil {
-				log.Fatalln("Failed to listen to store address", listenAddr, "because", err)
+				log.Fatalln("failed to listen to store address", listenAddr, "because", err)
 			}
 
 			grpcServerListener = lis
@@ -75,7 +81,7 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/."+rootCmdUse+".yaml)")
 
-	rootCmd.PersistentFlags().StringVar(&listenAddr, "listenAddr", "localhost:57755", "Bind address to store gRPC server")
+	rootCmd.PersistentFlags().StringVar(&listenAddr, "listenAddr", "0.0.0.0:6336", "Bind address to store gRPC server")
 	rootCmd.PersistentFlags().BoolVar(&enableTls, "tls", false, "Enable TLS protocol only on gRPC server")
 	rootCmd.PersistentFlags().StringVar(&tlsKey, "tlsKey", "", "PEM encoded private key file path")
 	rootCmd.PersistentFlags().StringVar(&tlsCert, "tlsCert", "", "PEM encoded certificate file path")
@@ -83,6 +89,14 @@ func init() {
 }
 
 func serveGrpcServer() {
+
+	if eventStoreService.Backend != nil {
+		apiv1.RegisterEventStoreServer(grpcServer, eventStoreService)
+	}
+
+	if snapshotStoreService.Backend != nil {
+		apiv1.RegisterSnapshotStoreServer(grpcServer, snapshotStoreService)
+	}
 
 	reflection.Register(grpcServer)
 

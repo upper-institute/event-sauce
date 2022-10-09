@@ -30,7 +30,7 @@ func init() {
 	flag.StringVar(&listenAddr, "listenAddr", "192.168.0.101:6336", "Paprika service server dial address")
 }
 
-func getPaprikaServiceClient(t *testing.T) (context.Context, context.CancelFunc, apiv1.PaprikaServiceClient) {
+func getSnapshotStoreClient(t *testing.T) (context.Context, context.CancelFunc, apiv1.SnapshotStoreClient) {
 
 	conn, err := grpc.Dial(listenAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
@@ -38,7 +38,7 @@ func getPaprikaServiceClient(t *testing.T) (context.Context, context.CancelFunc,
 		t.Fatal(err)
 	}
 
-	paprikaClient := apiv1.NewPaprikaServiceClient(conn)
+	snapshotClient := apiv1.NewSnapshotStoreClient(conn)
 
 	ctx := context.Background()
 
@@ -51,7 +51,7 @@ func getPaprikaServiceClient(t *testing.T) (context.Context, context.CancelFunc,
 		ctx, cancel = context.WithDeadline(ctx, deadline)
 	}
 
-	return ctx, cancel, paprikaClient
+	return ctx, cancel, snapshotClient
 
 }
 
@@ -60,7 +60,7 @@ func TestRepeatedTransaction(t *testing.T) {
 
 func TestSet(t *testing.T) {
 
-	ctx, cancel, paprikaClient := getPaprikaServiceClient(t)
+	ctx, cancel, snapshotClient := getSnapshotStoreClient(t)
 
 	defer cancel()
 
@@ -72,7 +72,7 @@ func TestSet(t *testing.T) {
 
 	snapshot.Payload = payload
 
-	_, err = paprikaClient.Set(ctx, snapshot)
+	_, err = snapshotClient.Set(ctx, snapshot)
 
 	if err != nil {
 		t.Error(err)
@@ -82,11 +82,11 @@ func TestSet(t *testing.T) {
 
 func TestGet(t *testing.T) {
 
-	ctx, cancel, paprikaClient := getPaprikaServiceClient(t)
+	ctx, cancel, snapshotClient := getSnapshotStoreClient(t)
 
 	defer cancel()
 
-	resSnapshot, err := paprikaClient.Get(ctx, &apiv1.Snapshot_GetRequest{
+	resSnapshot, err := snapshotClient.Get(ctx, &apiv1.Snapshot_GetRequest{
 		Id: snapshot.Id,
 	})
 

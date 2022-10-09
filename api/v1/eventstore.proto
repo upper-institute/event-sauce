@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package eventsauce.api.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/empty.proto";
+import "v1/query.proto";
+
+message Event {
+
+    string id = 1;
+    int64 version = 2;
+    google.protobuf.Timestamp natural_timestamp = 3;
+    google.protobuf.Timestamp store_timestamp = 4;
+    google.protobuf.Any payload = 5;
+
+    message AppendRequest {
+        repeated Event events = 1;
+    }
+
+    message ScanRequest {
+        string id = 1;
+        eventsauce.api.v1.Query start = 2;
+        eventsauce.api.v1.Query end = 3;
+    }
+
+    message LatestRequest {
+        string id = 1;
+    }
+
+}
+
+service EventStore {
+    rpc Append(Event.AppendRequest) returns(google.protobuf.Empty) {}
+    rpc Scan(Event.ScanRequest) returns(stream Event) {}
+    rpc Latest(Event.LatestRequest)returns(Event) {}
+}

@@ -7,15 +7,16 @@ services:
     ports:
       - 6379:6379
 
-  paprika:
-    image: paprika
-    ports:
-      - 6336:6336
+  store:
+    image: flipbook
     command:
-      - paprika
-      - redis
+      - start
       - --listenAddr=0.0.0.0:6336
+      - --snapshotStoreBackend=redis
       - --redisShards=redis:6379
+      - --eventStoreBackend=dynamodb
+      - --awsAccessKeyID=${AWS_ACCESS_KEY_ID}
+      - --awsSecretAccessKey=${AWS_SECRET_ACCESS_KEY}
 
   grpcui:
     image: fullstorydev/grpcui
@@ -24,4 +25,4 @@ services:
     command:
       - -plaintext
       - -use-reflection
-      - paprika:6336
+      - store:6336
