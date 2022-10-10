@@ -12,6 +12,7 @@ import (
 	"github.com/aws/smithy-go"
 	"github.com/upper-institute/event-sauce/internal/validation"
 	apiv1 "github.com/upper-institute/event-sauce/pkg/api/v1"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -22,9 +23,10 @@ type DynamoDBEventStore struct {
 }
 
 var (
-	zeroVersionAttr  = &types.AttributeValueMemberN{Value: "0"}
-	latestProjection = aws.String("latest")
-	scanProjection   = aws.String("version, naturalTimestamp, storeTimestamp, payloadTypeUrl, payloadData")
+	zeroVersionAttr           = &types.AttributeValueMemberN{Value: "0"}
+	latestProjection          = aws.String("latest")
+	latestWithEventProjection = aws.String("latest, eventData")
+	scanProjection            = aws.String("version, naturalTimestamp, storeTimestamp, payloadTypeUrl, payloadData")
 )
 
 func (e *DynamoDBEventStore) Append(ctx context.Context, id string, version int64, events []*apiv1.Event) error {
@@ -40,32 +42,35 @@ func (e *DynamoDBEventStore) Append(ctx context.Context, id string, version int6
 
 	if current == 0 {
 
-		_, err := e.DynamoDB.PutItem(ctx, &dynamodb.PutItemInput{
+		_, err = e.DynamoDB.PutItem(ctx, &dynamodb.PutItemInput{
 			TableName: tableName,
 			Item: map[string]types.AttributeValue{
-				"id":      idAttr,
-				"version": zeroVersionAttr,
-				"latest":  zeroVersionAttr,
+				"id":        idAttr,
+				"version":   zeroVersionAttr,
+				"latest":    zeroVersionAttr,
+				"eventData": &types.AttributeValueMemberNULL{Value: true},
 			},
 			ConditionExpression: aws.String("attribute_not_exists(id)"),
 		})
 
-		if err != nil {
-			return err
-		}
-
 	} else {
+		latest, err = e.getLatestVersion(ctx, idAttr, nil)
+	}
 
-		latest, err = e.getLatestVersion(ctx, idAttr)
-
-		if err != nil {
-			return err
-		}
-
+	if err != nil {
+		return err
 	}
 
 	if current != latest {
 		return validation.LatestVersionMismatchErr
+	}
+
+	latestEvent := events[len(events)-1]
+
+	encodedLatest, err := proto.Marshal(latestEvent)
+
+	if err != nil {
+		return err
 	}
 
 	transactItems := []types.TransactWriteItem{
@@ -75,11 +80,12 @@ func (e *DynamoDBEventStore) Append(ctx context.Context, id string, version int6
 					"id":      idAttr,
 					"version": zeroVersionAttr,
 				},
-				UpdateExpression:    aws.String("SET latest = :latest"),
+				UpdateExpression:    aws.String("SET latest = :latest, eventData = :eventData"),
 				TableName:           tableName,
 				ConditionExpression: aws.String("latest = :current"),
 				ExpressionAttributeValues: map[string]types.AttributeValue{
-					":current": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(latest), 10)},
+					":current":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(latest), 10)},
+					":eventData": &types.AttributeValueMemberB{Value: encodedLatest},
 				},
 			},
 		},
@@ -193,7 +199,13 @@ func unmarshalEvent(item map[string]types.AttributeValue) *apiv1.Event {
 
 // }
 
-func (e *DynamoDBEventStore) getLatestVersion(ctx context.Context, idAttr types.AttributeValue) (int64, error) {
+func (e *DynamoDBEventStore) getLatestVersion(ctx context.Context, idAttr types.AttributeValue, event *apiv1.Event) (int64, error) {
+
+	projection := latestProjection
+
+	if event != nil {
+		projection = latestWithEventProjection
+	}
 
 	res, err := e.DynamoDB.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(e.TableName),
@@ -201,7 +213,7 @@ func (e *DynamoDBEventStore) getLatestVersion(ctx context.Context, idAttr types.
 			"id":      idAttr,
 			"version": zeroVersionAttr,
 		},
-		ProjectionExpression: latestProjection,
+		ProjectionExpression: projection,
 	})
 
 	if err != nil || res.Item == nil || len(res.Item) == 0 {
@@ -216,6 +228,18 @@ func (e *DynamoDBEventStore) getLatestVersion(ctx context.Context, idAttr types.
 		return 0, err
 	}
 
+	if latest > 0 && event != nil {
+
+		encodedAttr := res.Item["latest"].(*types.AttributeValueMemberB)
+
+		err = proto.Unmarshal(encodedAttr.Value, event)
+
+		if err != nil {
+			return 0, err
+		}
+
+	}
+
 	return int64(latest), nil
 
 }
@@ -224,28 +248,13 @@ func (e *DynamoDBEventStore) Latest(ctx context.Context, id string) (*apiv1.Even
 
 	idAttr := &types.AttributeValueMemberS{Value: id}
 
-	latest, err := e.getLatestVersion(ctx, idAttr)
+	event := &apiv1.Event{}
+
+	latest, err := e.getLatestVersion(ctx, idAttr, event)
 
 	if err != nil || latest == 0 {
 		return nil, err
 	}
-
-	res, err := e.DynamoDB.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(e.TableName),
-		Key: map[string]types.AttributeValue{
-			"id":      idAttr,
-			"version": &types.AttributeValueMemberN{Value: strconv.FormatInt(latest, 10)},
-		},
-		ProjectionExpression: scanProjection,
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	event := unmarshalEvent(res.Item)
-
-	event.Id = id
 
 	return event, nil
 
