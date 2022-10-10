@@ -9,7 +9,7 @@ func IsValidID(id string) error {
 
 	_, err := uuid.Parse(id)
 
-	if err == nil {
+	if err != nil {
 		return InvalidIDErr
 	}
 
@@ -29,7 +29,7 @@ func IsValidVersion(version int64) error {
 
 func IsValidEventSlice(events []*apiv1.Event) error {
 
-	if events == nil || len(events) == 0 {
+	if len(events) == 0 {
 		return EmptyEventArrayErr
 	}
 
