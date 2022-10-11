@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	apiv1 "github.com/upper-institute/event-sauce/pkg/api/v1"
+	apiv1 "github.com/upper-institute/flipbook/pkg/api/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/anypb"

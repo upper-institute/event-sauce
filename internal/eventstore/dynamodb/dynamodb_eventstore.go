@@ -10,16 +10,24 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/smithy-go"
-	"github.com/upper-institute/event-sauce/internal/validation"
-	apiv1 "github.com/upper-institute/event-sauce/pkg/api/v1"
+	"github.com/upper-institute/flipbook/internal/eventstore"
+	"github.com/upper-institute/flipbook/internal/validation"
+	apiv1 "github.com/upper-institute/flipbook/pkg/api/v1"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type DynamoDBEventStore struct {
-	DynamoDB  *dynamodb.Client
-	TableName string
+	DynamoDB              *dynamodb.Client
+	TableName             string
+	NaturalTimestampIndex string
+}
+
+func New(backend *DynamoDBEventStore) *eventstore.EventStoreServer[*QueryBuilder] {
+	return &eventstore.EventStoreServer[*QueryBuilder]{
+		Backend: backend,
+	}
 }
 
 var (
@@ -193,11 +201,62 @@ func unmarshalEvent(item map[string]types.AttributeValue) *apiv1.Event {
 
 }
 
-// func (e *DynamoDBEventStore) Scan(*apiv1.Event_ScanRequest, apiv1.EventStore_ScanServer) error {
+func (e *DynamoDBEventStore) GetQueryBuilder(id string) *QueryBuilder {
+	return &QueryBuilder{
+		id:                    id,
+		naturalTimestampIndex: e.NaturalTimestampIndex,
+		params: &dynamodb.ScanInput{
+			TableName:            aws.String(e.TableName),
+			ConsistentRead:       aws.Bool(true),
+			ProjectionExpression: scanProjection,
+			ExclusiveStartKey: map[string]types.AttributeValue{
+				"id": &types.AttributeValueMemberS{Value: id},
+			},
+		},
+	}
+}
 
-// 	e.DynamoDB.Scan()
+func (e *DynamoDBEventStore) Scan(builder *QueryBuilder, stream apiv1.EventStore_ScanServer) error {
 
-// }
+	ctx := stream.Context()
+
+	for {
+
+		res, err := e.DynamoDB.Scan(ctx, builder.params)
+
+		switch {
+
+		case err != nil:
+			return err
+
+		case len(res.Items) == 0:
+			return nil
+
+		}
+
+		for _, item := range res.Items {
+
+			event := unmarshalEvent(item)
+
+			event.Id = builder.id
+
+			err = stream.Send(event)
+
+			if err != nil {
+				return err
+			}
+
+		}
+
+		if len(res.LastEvaluatedKey) == 0 {
+			return nil
+		}
+
+		builder.params.ExclusiveStartKey = res.LastEvaluatedKey
+
+	}
+
+}
 
 func (e *DynamoDBEventStore) getLatestVersion(ctx context.Context, idAttr types.AttributeValue, event *apiv1.Event) (int64, error) {
 

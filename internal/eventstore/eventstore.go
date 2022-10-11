@@ -3,24 +3,25 @@ package eventstore
 import (
 	"context"
 
-	"github.com/upper-institute/event-sauce/internal/validation"
-	apiv1 "github.com/upper-institute/event-sauce/pkg/api/v1"
-	"google.golang.org/grpc/status"
+	"github.com/upper-institute/flipbook/internal/validation"
+	apiv1 "github.com/upper-institute/flipbook/pkg/api/v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-type Backend interface {
+type Backend[Q validation.QueryBuilder] interface {
 	Append(ctx context.Context, id string, version int64, events []*apiv1.Event) error
+	GetQueryBuilder(id string) Q
+	Scan(builder Q, stream apiv1.EventStore_ScanServer) error
 	Latest(ctx context.Context, id string) (*apiv1.Event, error)
 }
 
-type EventStoreServer struct {
+type EventStoreServer[Q validation.QueryBuilder] struct {
 	apiv1.UnimplementedEventStoreServer
 
-	Backend Backend
+	Backend Backend[Q]
 }
 
-func (e *EventStoreServer) Append(ctx context.Context, req *apiv1.Event_AppendRequest) (*emptypb.Empty, error) {
+func (e *EventStoreServer[Q]) Append(ctx context.Context, req *apiv1.Event_AppendRequest) (*emptypb.Empty, error) {
 
 	err := validation.IsValidEventSlice(req.Events)
 
@@ -34,24 +35,33 @@ func (e *EventStoreServer) Append(ctx context.Context, req *apiv1.Event_AppendRe
 	err = e.Backend.Append(ctx, id, version, req.Events)
 
 	if err != nil {
-
-		if _, ok := status.FromError(err); ok {
-			return nil, err
-		}
-
-		return nil, validation.BackendAppendErr
+		return nil, validation.FallbackGRPCError(err, validation.BackendAppendErr)
 	}
 
 	return &emptypb.Empty{}, nil
 }
 
-// func (e *EventStoreServer) Scan(req *apiv1.Event_ScanRequest, stream apiv1.EventStore_ScanServer) error {
+func (e *EventStoreServer[Q]) Scan(req *apiv1.Event_ScanRequest, stream apiv1.EventStore_ScanServer) error {
 
-// 	// e.DynamoDB.Scan()
+	builder := e.Backend.GetQueryBuilder(req.Id)
 
-// }
+	err := validation.IsValidScanRequest(req, builder)
 
-func (e *EventStoreServer) Latest(ctx context.Context, req *apiv1.Event_LatestRequest) (*apiv1.Event, error) {
+	if err != nil {
+		return err
+	}
+
+	err = e.Backend.Scan(builder, stream)
+
+	if err != nil {
+		return validation.FallbackGRPCError(err, validation.BackendScanErr)
+	}
+
+	return nil
+
+}
+
+func (e *EventStoreServer[Q]) Latest(ctx context.Context, req *apiv1.Event_LatestRequest) (*apiv1.Event, error) {
 
 	err := validation.IsValidID(req.Id)
 
@@ -62,13 +72,7 @@ func (e *EventStoreServer) Latest(ctx context.Context, req *apiv1.Event_LatestRe
 	event, err := e.Backend.Latest(ctx, req.Id)
 
 	if err != nil {
-
-		if _, ok := status.FromError(err); ok {
-			return nil, err
-		}
-
-		return nil, validation.BackendLatestErr
-
+		return nil, validation.FallbackGRPCError(err, validation.BackendLatestErr)
 	}
 
 	if event == nil {

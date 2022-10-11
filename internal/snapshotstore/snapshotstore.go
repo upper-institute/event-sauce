@@ -4,9 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/upper-institute/event-sauce/internal/validation"
-	apiv1 "github.com/upper-institute/event-sauce/pkg/api/v1"
-	"google.golang.org/grpc/status"
+	"github.com/upper-institute/flipbook/internal/validation"
+	apiv1 "github.com/upper-institute/flipbook/pkg/api/v1"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -44,12 +43,7 @@ func (s *SnapshotStoreServer) Set(ctx context.Context, snapshot *apiv1.Snapshot)
 	err = s.Backend.Set(ctx, snapshot.Id, encodedSnapshot, snapshot.Ttl.AsDuration())
 
 	if err != nil {
-
-		if _, ok := status.FromError(err); ok {
-			return nil, err
-		}
-
-		return nil, validation.BackendSetErr
+		return nil, validation.FallbackGRPCError(err, validation.BackendSetErr)
 	}
 
 	return &emptypb.Empty{}, nil
@@ -67,12 +61,7 @@ func (s *SnapshotStoreServer) Get(ctx context.Context, req *apiv1.Snapshot_GetRe
 	encoded, err := s.Backend.Get(ctx, req.Id)
 
 	if err != nil {
-
-		if _, ok := status.FromError(err); ok {
-			return nil, err
-		}
-
-		return nil, validation.BackendSetErr
+		return nil, validation.FallbackGRPCError(err, validation.BackendGetErr)
 	}
 
 	if encoded == nil {

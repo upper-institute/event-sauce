@@ -7,11 +7,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	dynamodbdriver "github.com/upper-institute/event-sauce/internal/eventstore/dynamodb"
+	dynamodbdriver "github.com/upper-institute/flipbook/internal/eventstore/dynamodb"
 )
 
 var (
-	dynamodbEventsTable string = "events"
+	dynamodbEventsTable           string = "events"
+	dynamodbNaturalTimestampIndex string = "naturalTimestamp-index"
 )
 
 func dynamodbEventStoreBackend() error {
@@ -33,10 +34,10 @@ func dynamodbEventStoreBackend() error {
 
 	dynamoClient := dynamodb.NewFromConfig(cfg)
 
-	eventStoreService.Backend = &dynamodbdriver.DynamoDBEventStore{
+	eventStoreService = dynamodbdriver.New(&dynamodbdriver.DynamoDBEventStore{
 		DynamoDB:  dynamoClient,
 		TableName: dynamodbEventsTable,
-	}
+	})
 
 	return nil
 
@@ -45,5 +46,6 @@ func dynamodbEventStoreBackend() error {
 func init() {
 
 	startCmd.PersistentFlags().StringVar(&dynamodbEventsTable, "dynamodbEventsTable", dynamodbEventsTable, "DynamoDB events table name")
+	startCmd.PersistentFlags().StringVar(&dynamodbNaturalTimestampIndex, "dynamodbNaturalTimestampIndex", dynamodbNaturalTimestampIndex, "DynamoDB secondary index using natural timestamp as range key")
 
 }

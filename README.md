@@ -1,4 +1,4 @@
-# event-sauce
+# flipbook
 
 ## ToDos for v1
 
@@ -22,16 +22,6 @@
     - [ ] Container Build
   - Backend Support
     - [ ] AWS DynamoDB
-- SDK (Butter)
-  - [ ] Golang
-    - [ ] Developer Documentation
-    - [ ] Error Handling
-    - CI (GitHub Actions)
-      - [ ] Test Automation
-    - Features
-      - [ ] Cache LRU
-      - [ ] Restore
-      - [ ] Commit
 - Cloud Support
   - [ ] AWS
     - [ ] Terraform module for ECS

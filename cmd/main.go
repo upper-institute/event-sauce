@@ -1,7 +1,7 @@
 package main
 
 import (
-	flipbook "github.com/upper-institute/event-sauce/cmd/flipbook"
+	flipbook "github.com/upper-institute/flipbook/cmd/flipbook"
 )
 
 func main() {

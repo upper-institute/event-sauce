@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-redis/redis/v8"
-	redisdriver "github.com/upper-institute/event-sauce/internal/snapshotstore/redis"
+	redisdriver "github.com/upper-institute/flipbook/internal/snapshotstore/redis"
 )
 
 var (
@@ -23,9 +23,9 @@ func redisSnapshotStoreBackend() error {
 		Addrs: addrs,
 	})
 
-	snapshotStoreService.Backend = &redisdriver.RedisSnapshotStore{
+	snapshotStoreService = redisdriver.New(&redisdriver.RedisSnapshotStore{
 		Redis: redisClient,
-	}
+	})
 
 	return nil
 

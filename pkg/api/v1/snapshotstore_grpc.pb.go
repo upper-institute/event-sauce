@@ -37,7 +37,7 @@ func NewSnapshotStoreClient(cc grpc.ClientConnInterface) SnapshotStoreClient {
 
 func (c *snapshotStoreClient) Set(ctx context.Context, in *Snapshot, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, "/eventsauce.api.v1.SnapshotStore/Set", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/flipbook.api.v1.SnapshotStore/Set", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (c *snapshotStoreClient) Set(ctx context.Context, in *Snapshot, opts ...grp
 
 func (c *snapshotStoreClient) Get(ctx context.Context, in *Snapshot_GetRequest, opts ...grpc.CallOption) (*Snapshot, error) {
 	out := new(Snapshot)
-	err := c.cc.Invoke(ctx, "/eventsauce.api.v1.SnapshotStore/Get", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/flipbook.api.v1.SnapshotStore/Get", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func _SnapshotStore_Set_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/eventsauce.api.v1.SnapshotStore/Set",
+		FullMethod: "/flipbook.api.v1.SnapshotStore/Set",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SnapshotStoreServer).Set(ctx, req.(*Snapshot))
@@ -113,7 +113,7 @@ func _SnapshotStore_Get_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/eventsauce.api.v1.SnapshotStore/Get",
+		FullMethod: "/flipbook.api.v1.SnapshotStore/Get",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SnapshotStoreServer).Get(ctx, req.(*Snapshot_GetRequest))
@@ -125,7 +125,7 @@ func _SnapshotStore_Get_Handler(srv interface{}, ctx context.Context, dec func(i
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var SnapshotStore_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "eventsauce.api.v1.SnapshotStore",
+	ServiceName: "flipbook.api.v1.SnapshotStore",
 	HandlerType: (*SnapshotStoreServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

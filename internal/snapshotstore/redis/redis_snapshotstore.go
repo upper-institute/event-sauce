@@ -5,10 +5,17 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/upper-institute/flipbook/internal/snapshotstore"
 )
 
 type RedisSnapshotStore struct {
 	Redis redis.UniversalClient
+}
+
+func New(backend *RedisSnapshotStore) *snapshotstore.SnapshotStoreServer {
+	return &snapshotstore.SnapshotStoreServer{
+		Backend: backend,
+	}
 }
 
 func (p *RedisSnapshotStore) Set(ctx context.Context, id string, encoded []byte, ttl time.Duration) error {

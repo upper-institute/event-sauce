@@ -9,9 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/upper-institute/event-sauce/internal/eventstore"
-	"github.com/upper-institute/event-sauce/internal/snapshotstore"
-	apiv1 "github.com/upper-institute/event-sauce/pkg/api/v1"
+	apiv1 "github.com/upper-institute/flipbook/pkg/api/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
@@ -30,12 +28,12 @@ var (
 	grpcServerListener net.Listener
 	grpcServer         *grpc.Server
 
-	eventStoreService    = &eventstore.EventStoreServer{}
-	snapshotStoreService = &snapshotstore.SnapshotStoreServer{}
+	eventStoreService    apiv1.EventStoreServer
+	snapshotStoreService apiv1.SnapshotStoreServer
 
 	rootCmd = &cobra.Command{
 		Use:   rootCmdUse,
-		Short: "EventSauce - Snapshot store",
+		Short: "flipbook - Snapshot store",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 
 			opts := []grpc.ServerOption{}
@@ -90,11 +88,11 @@ func init() {
 
 func serveGrpcServer() {
 
-	if eventStoreService.Backend != nil {
+	if eventStoreService != nil {
 		apiv1.RegisterEventStoreServer(grpcServer, eventStoreService)
 	}
 
-	if snapshotStoreService.Backend != nil {
+	if snapshotStoreService != nil {
 		apiv1.RegisterSnapshotStoreServer(grpcServer, snapshotStoreService)
 	}
 

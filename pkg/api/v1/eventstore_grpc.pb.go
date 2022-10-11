@@ -38,7 +38,7 @@ func NewEventStoreClient(cc grpc.ClientConnInterface) EventStoreClient {
 
 func (c *eventStoreClient) Append(ctx context.Context, in *Event_AppendRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, "/eventsauce.api.v1.EventStore/Append", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/flipbook.api.v1.EventStore/Append", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (c *eventStoreClient) Append(ctx context.Context, in *Event_AppendRequest, 
 }
 
 func (c *eventStoreClient) Scan(ctx context.Context, in *Event_ScanRequest, opts ...grpc.CallOption) (EventStore_ScanClient, error) {
-	stream, err := c.cc.NewStream(ctx, &EventStore_ServiceDesc.Streams[0], "/eventsauce.api.v1.EventStore/Scan", opts...)
+	stream, err := c.cc.NewStream(ctx, &EventStore_ServiceDesc.Streams[0], "/flipbook.api.v1.EventStore/Scan", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (x *eventStoreScanClient) Recv() (*Event, error) {
 
 func (c *eventStoreClient) Latest(ctx context.Context, in *Event_LatestRequest, opts ...grpc.CallOption) (*Event, error) {
 	out := new(Event)
-	err := c.cc.Invoke(ctx, "/eventsauce.api.v1.EventStore/Latest", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/flipbook.api.v1.EventStore/Latest", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func _EventStore_Append_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/eventsauce.api.v1.EventStore/Append",
+		FullMethod: "/flipbook.api.v1.EventStore/Append",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(EventStoreServer).Append(ctx, req.(*Event_AppendRequest))
@@ -171,7 +171,7 @@ func _EventStore_Latest_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/eventsauce.api.v1.EventStore/Latest",
+		FullMethod: "/flipbook.api.v1.EventStore/Latest",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(EventStoreServer).Latest(ctx, req.(*Event_LatestRequest))
@@ -183,7 +183,7 @@ func _EventStore_Latest_Handler(srv interface{}, ctx context.Context, dec func(i
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var EventStore_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "eventsauce.api.v1.EventStore",
+	ServiceName: "flipbook.api.v1.EventStore",
 	HandlerType: (*EventStoreServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

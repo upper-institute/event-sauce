@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package eventsauce.api.v1;
+package flipbook.api.v1;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/any.proto";
@@ -21,8 +21,9 @@ message Event {
 
     message ScanRequest {
         string id = 1;
-        eventsauce.api.v1.Query start = 2;
-        eventsauce.api.v1.Query end = 3;
+        flipbook.api.v1.QueryParameter start = 2;
+        flipbook.api.v1.QueryParameter end = 3;
+        flipbook.api.v1.QueryOperator end_operator = 4;
     }
 
     message LatestRequest {
