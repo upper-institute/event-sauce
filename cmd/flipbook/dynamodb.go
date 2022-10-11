@@ -35,8 +35,9 @@ func dynamodbEventStoreBackend() error {
 	dynamoClient := dynamodb.NewFromConfig(cfg)
 
 	eventStoreService = dynamodbdriver.New(&dynamodbdriver.DynamoDBEventStore{
-		DynamoDB:  dynamoClient,
-		TableName: dynamodbEventsTable,
+		DynamoDB:              dynamoClient,
+		TableName:             dynamodbEventsTable,
+		NaturalTimestampIndex: dynamodbNaturalTimestampIndex,
 	})
 
 	return nil
