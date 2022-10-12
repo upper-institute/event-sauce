@@ -37,18 +37,17 @@ var (
 	scanProjection            = aws.String("version, naturalTimestamp, storeTimestamp, payloadTypeUrl, payloadData")
 )
 
-func (e *DynamoDBEventStore) Append(ctx context.Context, id string, version int64, events []*apiv1.Event) error {
+func (e *DynamoDBEventStore) Append(ctx context.Context, id string, latestVersion int64, events []*apiv1.Event) error {
 
 	tableName := aws.String(e.TableName)
 
 	idAttr := &types.AttributeValueMemberS{Value: id}
 
-	latest := int64(0)
-	current := version - 1
+	latestFromDB := int64(0)
 
 	var err error
 
-	if current == 0 {
+	if latestVersion == 0 {
 
 		_, err = e.DynamoDB.PutItem(ctx, &dynamodb.PutItemInput{
 			TableName: tableName,
@@ -62,53 +61,42 @@ func (e *DynamoDBEventStore) Append(ctx context.Context, id string, version int6
 		})
 
 	} else {
-		latest, err = e.getLatestVersion(ctx, idAttr, nil)
+		latestFromDB, err = e.getLatestVersion(ctx, idAttr, nil)
 	}
 
-	if err != nil {
+	switch {
+	case err != nil && strings.Contains(err.Error(), "ConditionalCheckFailedException"):
+		return validation.LatestVersionMismatchErr
+	case err != nil:
 		return err
 	}
 
-	if current != latest {
+	if latestVersion != latestFromDB {
 		return validation.LatestVersionMismatchErr
 	}
 
-	latestEvent := events[len(events)-1]
+	transactItems := []types.TransactWriteItem{}
 
-	encodedLatest, err := proto.Marshal(latestEvent)
-
-	if err != nil {
-		return err
-	}
-
-	transactItems := []types.TransactWriteItem{
-		{
-			Update: &types.Update{
-				Key: map[string]types.AttributeValue{
-					"id":      idAttr,
-					"version": zeroVersionAttr,
-				},
-				UpdateExpression:    aws.String("SET latest = :latest, eventData = :eventData"),
-				TableName:           tableName,
-				ConditionExpression: aws.String("latest = :current"),
-				ExpressionAttributeValues: map[string]types.AttributeValue{
-					":current":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(latest), 10)},
-					":eventData": &types.AttributeValueMemberB{Value: encodedLatest},
-				},
-			},
-		},
-	}
-
-	now := &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339Nano)}
+	now := time.Now()
+	nowProto := timestamppb.New(now)
+	nowAttr := &types.AttributeValueMemberS{Value: now.Format(time.RFC3339Nano)}
 
 	var (
 		latestAttr       *types.AttributeValueMemberN
 		naturalTimestamp types.AttributeValue
 	)
 
+	current := latestVersion
+
 	for _, event := range events {
 
-		latestAttr = &types.AttributeValueMemberN{Value: strconv.FormatInt(version, 10)}
+		latestVersion++
+
+		event.Id = id
+		event.Version = latestVersion
+		event.StoreTimestamp = nowProto
+
+		latestAttr = &types.AttributeValueMemberN{Value: strconv.FormatInt(latestVersion, 10)}
 
 		naturalTimestamp = &types.AttributeValueMemberNULL{Value: true}
 
@@ -123,18 +111,40 @@ func (e *DynamoDBEventStore) Append(ctx context.Context, id string, version int6
 					"id":               idAttr,
 					"version":          latestAttr,
 					"naturalTimestamp": naturalTimestamp,
-					"storeTimestamp":   now,
+					"storeTimestamp":   nowAttr,
 					"payloadTypeUrl":   &types.AttributeValueMemberS{Value: event.Payload.TypeUrl},
 					"payloadData":      &types.AttributeValueMemberB{Value: event.Payload.Value},
 				},
 			},
 		})
 
-		version++
-
 	}
 
-	transactItems[0].Update.ExpressionAttributeValues[":latest"] = &types.AttributeValueMemberN{Value: strconv.FormatInt(version, 10)}
+	latestEvent := events[len(events)-1]
+
+	encodedLatest, err := proto.Marshal(latestEvent)
+
+	if err != nil {
+		return err
+	}
+
+	transactItems = append(transactItems, types.TransactWriteItem{
+		Update: &types.Update{
+			Key: map[string]types.AttributeValue{
+				"id":      idAttr,
+				"version": zeroVersionAttr,
+			},
+			UpdateExpression:    aws.String("SET latest = :latest, eventData = :eventData"),
+			TableName:           tableName,
+			ConditionExpression: aws.String("latest = :current"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":current":   &types.AttributeValueMemberN{Value: strconv.FormatInt(current, 10)},
+				":latest":    &types.AttributeValueMemberN{Value: strconv.FormatInt(latestVersion, 10)},
+				":eventData": &types.AttributeValueMemberB{Value: encodedLatest},
+			},
+		},
+	},
+	)
 
 	_, err = e.DynamoDB.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
 		TransactItems: transactItems,
@@ -289,7 +299,7 @@ func (e *DynamoDBEventStore) getLatestVersion(ctx context.Context, idAttr types.
 
 	if latest > 0 && event != nil {
 
-		encodedAttr := res.Item["latest"].(*types.AttributeValueMemberB)
+		encodedAttr := res.Item["eventData"].(*types.AttributeValueMemberB)
 
 		err = proto.Unmarshal(encodedAttr.Value, event)
 

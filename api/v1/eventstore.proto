@@ -16,6 +16,8 @@ message Event {
     google.protobuf.Any payload = 5;
 
     message AppendRequest {
+        int64 latest_version = 2;
+        string id = 3;
         repeated Event events = 1;
     }
 

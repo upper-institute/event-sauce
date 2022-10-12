@@ -58,6 +58,7 @@ func (q *QueryBuilder) SetNaturalTimestampRange(start time.Time, end time.Time, 
 		q.params.FilterExpression = filterNaturalTimestamp
 	}
 
+	q.params.ExclusiveStartKey["version"] = zeroVersionAttr
 	q.params.ExclusiveStartKey["naturalTimestamp"] = &types.AttributeValueMemberS{Value: start.Format(time.RFC3339Nano)}
 
 }

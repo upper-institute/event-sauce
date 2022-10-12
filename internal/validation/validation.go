@@ -21,7 +21,7 @@ func IsValidID(id string) error {
 
 func IsValidVersion(version int64) error {
 
-	if version < 1 {
+	if version < 0 {
 		return InvalidVersionErr
 	}
 
@@ -33,31 +33,6 @@ func IsValidEventSlice(events []*apiv1.Event) error {
 
 	if len(events) == 0 {
 		return EmptyEventArrayErr
-	}
-
-	id := events[0].Id
-	version := events[0].Version
-
-	for _, event := range events {
-
-		if err := IsValidVersion(event.Version); err != nil {
-			return err
-		}
-
-		if version != event.Version {
-			return InconsistentVersionErr
-		}
-
-		if err := IsValidID(event.Id); err != nil {
-			return err
-		}
-
-		if id != event.Id {
-			return InconsistentIDErr
-		}
-
-		version++
-
 	}
 
 	return nil
@@ -124,7 +99,7 @@ func IsValidScanRequest(req *apiv1.Event_ScanRequest, builder QueryBuilder) erro
 			return err
 		}
 
-		if start.Version > end.Version {
+		if req.EndOperator == apiv1.QueryOperator_QUERY_OPERATOR_LESS_THAN_OR_EQUAL && start.Version > end.Version {
 			return InvalidVersionRangeErr
 		}
 
@@ -138,14 +113,14 @@ func IsValidScanRequest(req *apiv1.Event_ScanRequest, builder QueryBuilder) erro
 			return InconsistentRangeErr
 		}
 
-		if !start.NaturalTimestamp.IsValid() || end.NaturalTimestamp.IsValid() {
+		if !start.NaturalTimestamp.IsValid() || !end.NaturalTimestamp.IsValid() {
 			return InvalidQueryNaturalTimestampErr
 		}
 
 		startTimestamp := start.NaturalTimestamp.AsTime()
 		endTimestamp := end.NaturalTimestamp.AsTime()
 
-		if startTimestamp.After(endTimestamp) {
+		if req.EndOperator == apiv1.QueryOperator_QUERY_OPERATOR_LESS_THAN_OR_EQUAL && startTimestamp.After(endTimestamp) {
 			return InvalidNaturalTimestampRangeErr
 		}
 

@@ -2,26 +2,26 @@
 
 ## ToDos for v1
 
-- SnapshotStore (Paprika)
+- SnapshotStore
   - [ ] Developer Documentation
-  - [ ] Input Validation
+  - [X] Input Validation
   - [ ] Metrics Endpoint
-  - [ ] Error Handling
+  - [ ] Error Handling/Logging
   - CI (GitHub Actions)
     - [ ] Test Automation
     - [ ] Container Build
   - Backend Support
-    - [ ] Redis (Ring Cluster)
-- EventStore (Onion)
+    - [X] Redis (Ring Cluster)
+- EventStore
   - [ ] Developer Documentation
-  - [ ] Input Validation
+  - [X] Input Validation
   - [ ] Metrics Endpoint
-  - [ ] Error Handling
+  - [ ] Error Handling/Logging
   - CI (GitHub Actions)
     - [ ] Test Automation
     - [ ] Container Build
   - Backend Support
-    - [ ] AWS DynamoDB
+    - [X] AWS DynamoDB
 - Cloud Support
   - [ ] AWS
     - [ ] Terraform module for ECS

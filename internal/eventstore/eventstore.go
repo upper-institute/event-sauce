@@ -9,7 +9,7 @@ import (
 )
 
 type Backend[Q validation.QueryBuilder] interface {
-	Append(ctx context.Context, id string, version int64, events []*apiv1.Event) error
+	Append(ctx context.Context, id string, latestVersion int64, events []*apiv1.Event) error
 	GetQueryBuilder(id string) Q
 	Scan(builder Q, stream apiv1.EventStore_ScanServer) error
 	Latest(ctx context.Context, id string) (*apiv1.Event, error)
@@ -29,10 +29,22 @@ func (e *EventStoreServer[Q]) Append(ctx context.Context, req *apiv1.Event_Appen
 		return nil, err
 	}
 
-	version := req.Events[0].Version
-	id := req.Events[0].Id
+	err = validation.IsValidVersion(req.LatestVersion)
 
-	err = e.Backend.Append(ctx, id, version, req.Events)
+	if err != nil {
+		return nil, err
+	}
+
+	err = validation.IsValidID(req.Id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	latestVersion := req.LatestVersion
+	id := req.Id
+
+	err = e.Backend.Append(ctx, id, latestVersion, req.Events)
 
 	if err != nil {
 		return nil, validation.FallbackGRPCError(err, validation.BackendAppendErr)
