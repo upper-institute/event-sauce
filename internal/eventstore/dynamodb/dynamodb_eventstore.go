@@ -77,7 +77,7 @@ func (e *DynamoDBEventStore) Append(ctx context.Context, id string, latestVersio
 
 	transactItems := []types.TransactWriteItem{}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	nowProto := timestamppb.New(now)
 	nowAttr := &types.AttributeValueMemberS{Value: now.Format(time.RFC3339Nano)}
 
