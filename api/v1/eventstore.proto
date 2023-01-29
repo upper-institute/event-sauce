@@ -1,41 +1,12 @@
 syntax = "proto3";
 
-package flipbook.api.v1;
+package flipbook.v1;
 
-import "google/protobuf/timestamp.proto";
-import "google/protobuf/any.proto";
 import "google/protobuf/empty.proto";
-import "v1/query.proto";
-
-message Event {
-
-    string id = 1;
-    int64 version = 2;
-    google.protobuf.Timestamp natural_timestamp = 3;
-    google.protobuf.Timestamp store_timestamp = 4;
-    google.protobuf.Any payload = 5;
-
-    message AppendRequest {
-        int64 latest_version = 2;
-        string id = 3;
-        repeated Event events = 1;
-    }
-
-    message ScanRequest {
-        string id = 1;
-        flipbook.api.v1.QueryParameter start = 2;
-        flipbook.api.v1.QueryParameter end = 3;
-        flipbook.api.v1.QueryOperator end_operator = 4;
-    }
-
-    message LatestRequest {
-        string id = 1;
-    }
-
-}
+import "api/v1/event.proto";
 
 service EventStore {
-    rpc Append(Event.AppendRequest) returns(google.protobuf.Empty) {}
-    rpc Scan(Event.ScanRequest) returns(stream Event) {}
-    rpc Latest(Event.LatestRequest)returns(Event) {}
+    rpc Append(flipbook.v1.Event.AppendRequest) returns(google.protobuf.Empty) {}
+    rpc Iterate(stream flipbook.v1.Event.IterateRequest) returns(stream flipbook.v1.Event) {}
+    rpc GetLatest(flipbook.v1.Event.GetLatestRequest) returns(flipbook.v1.Event) {}
 }

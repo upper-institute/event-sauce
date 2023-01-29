@@ -1,0 +1,16 @@
+{
+    "version": "2",
+    "sql": [
+        {
+            "engine": "postgresql",
+            "queries": "internal/drivers/postgres/query.sql",
+            "schema": "internal/drivers/postgres/schema.sql",
+            "gen": {
+                "go": {
+                    "package": "database",
+                    "out": "internal/drivers/postgres/database/"
+                }
+            }
+        }
+    ]
+}

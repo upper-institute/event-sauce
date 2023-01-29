@@ -2,13 +2,13 @@ version: v1
 managed:
   enabled: true
   go_package_prefix:
-    default: github.com/upper-institute/flipbook/pkg/api/v1
+    default: github.com/upper-institute/flipbook/proto/v1
 plugins:
   - name: go
-    out: pkg/api
+    out: proto
     opt:
       - paths=source_relative
   - name: go-grpc
-    out: pkg/api
+    out: proto
     opt:
       - paths=source_relative

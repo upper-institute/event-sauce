@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package flipbook.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
+import "api/v1/query.proto";
+
+enum SortingKeyType {
+    SORTING_KEY_INCREASING_SEQUENCE = 0;
+    SORTING_KEY_ARBITRARY_NUMBER = 1;
+}
+
+message Event {
+
+    /* This key is used to route events to partitions. It must be unique for the
+    source generating it. We recommend using any well known standard like UUIDs
+    with a meaningful representation for business domainds */
+    string partition_key = 1;
+    /* This key is used to control two things:
+    1. The payload stored in this exact sorting key (a sorting key can only have 1 payload)
+    2. The sorting order for EventStore.Iterate() 
+    
+    An event "id" is the combination of the partition_key+sorting_key */
+    int64 sorting_key = 2;
+    google.protobuf.Any event_payload = 3;
+
+    SortingKeyType sorting_key_type = 4;
+
+
+    message AppendRequest {
+        repeated Event events = 1;
+    }
+
+    message IterateRequest {
+        string partition_key = 1;
+        flipbook.v1.Query query = 2;
+        int64 batch_size = 3;
+    }
+
+    message GetLatestRequest {
+        string partition_key = 1;
+    }
+
+
+}

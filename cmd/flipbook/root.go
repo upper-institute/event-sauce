@@ -1,7 +1,6 @@
 package flipbook
 
 import (
-	"crypto/tls"
 	"fmt"
 	"log"
 	"net"
@@ -9,59 +8,57 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	apiv1 "github.com/upper-institute/flipbook/pkg/api/v1"
+	"github.com/upper-institute/flipbook/internal"
+	"github.com/upper-institute/flipbook/internal/helpers"
+	flipbookv1 "github.com/upper-institute/flipbook/proto/api/v1"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
 )
 
-const rootCmdUse = "flipbook"
+const (
+	rootCmdUse = "flipbook"
+
+	grpcAddress_flag = "grpc.address"
+)
 
 var (
 	cfgFile string
 
-	listenAddr string
-	enableTls  bool
-	tlsKey     string
-	tlsCert    string
-
-	grpcServerListener net.Listener
-	grpcServer         *grpc.Server
-
-	eventStoreService    apiv1.EventStoreServer
-	snapshotStoreService apiv1.SnapshotStoreServer
+	server   *grpc.Server
+	flagCont helpers.FlagController
 
 	rootCmd = &cobra.Command{
 		Use:   rootCmdUse,
 		Short: "flipbook - Snapshot store",
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		Run: func(cmd *cobra.Command, args []string) {
 
-			opts := []grpc.ServerOption{}
+			addr := viper.GetString(grpcAddress_flag)
 
-			if enableTls {
-
-				cert, err := tls.LoadX509KeyPair(tlsCert, tlsKey)
-				if err != nil {
-					log.Fatalln("failed load TLS certificate (", tlsCert, ") or key (", tlsKey, ") because", err)
-				}
-
-				config := &tls.Config{
-					Certificates: []tls.Certificate{cert},
-					ClientAuth:   tls.VerifyClientCertIfGiven,
-				}
-
-				opts = append(opts, grpc.Creds(credentials.NewTLS(config)))
-
-			}
-
-			lis, err := net.Listen("tcp", listenAddr)
+			lis, err := net.Listen("tcp", addr)
 			if err != nil {
-				log.Fatalln("failed to listen to store address", listenAddr, "because", err)
+				log.Fatalln("failed to listen to store address", addr, "because", err)
 			}
 
-			grpcServerListener = lis
+			server = grpc.NewServer()
 
-			grpcServer = grpc.NewServer(opts...)
+			storeAdapter := internal.GetStoreAdapter(flagCont)
+
+			storeDriver, err := storeAdapter.New(flagCont)
+			if err != nil {
+
+			}
+
+			store := internal.NewEventStore(storeDriver)
+
+			flipbookv1.RegisterEventStoreServer(server, store)
+
+			reflection.Register(server)
+
+			log.Println("Server listening at:", lis.Addr())
+
+			if err := server.Serve(lis); err != nil {
+				log.Fatalln("Failed to serve because", err)
+			}
 
 		},
 	}
@@ -79,30 +76,11 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/."+rootCmdUse+".yaml)")
 
-	rootCmd.PersistentFlags().StringVar(&listenAddr, "listenAddr", "0.0.0.0:6336", "Bind address to store gRPC server")
-	rootCmd.PersistentFlags().BoolVar(&enableTls, "tls", false, "Enable TLS protocol only on gRPC server")
-	rootCmd.PersistentFlags().StringVar(&tlsKey, "tlsKey", "", "PEM encoded private key file path")
-	rootCmd.PersistentFlags().StringVar(&tlsCert, "tlsCert", "", "PEM encoded certificate file path")
+	flagCont = helpers.NewFlagController(viper.GetViper(), rootCmd.PersistentFlags())
 
-}
+	flagCont.BindString(grpcAddress_flag, "0.0.0.0:6333", "Bind address for gRPC server listener")
 
-func serveGrpcServer() {
-
-	if eventStoreService != nil {
-		apiv1.RegisterEventStoreServer(grpcServer, eventStoreService)
-	}
-
-	if snapshotStoreService != nil {
-		apiv1.RegisterSnapshotStoreServer(grpcServer, snapshotStoreService)
-	}
-
-	reflection.Register(grpcServer)
-
-	log.Println("Server listening at:", grpcServerListener.Addr())
-
-	if err := grpcServer.Serve(grpcServerListener); err != nil {
-		log.Fatalln("Failed to serve because", err)
-	}
+	internal.BindWellKnownDrivers(flagCont)
 
 }
 

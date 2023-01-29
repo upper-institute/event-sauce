@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package flipbook.v1;
+
+import "google/protobuf/duration.proto";
+import "api/v1/endpoint.proto";
+
+message Channel {
+
+    string channel_id = 1;
+    repeated flipbook.v1.Endpoint producers = 2;
+    repeated flipbook.v1.Endpoint consumers = 3;
+    int64 estimated_consistency_level = 4;
+
+    message OpenRequest {
+        string channel_id = 1;
+        repeated flipbook.v1.Endpoint producers = 2;
+        repeated flipbook.v1.Endpoint consumers = 3;
+        google.protobuf.Duration pull_interval = 4;
+    }
+
+    message CloseRequest {
+        string channel_id = 1;
+    }
+
+    message WatchRequest {
+        repeated string channel_ids = 1;
+    }
+
+}

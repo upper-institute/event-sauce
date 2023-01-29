@@ -1,19 +1,17 @@
 syntax = "proto3";
 
-package flipbook.api.v1;
+package flipbook.v1;
 
 import "google/protobuf/timestamp.proto";
 
-enum QueryOperator {
-    QUERY_OPERATOR_LESS_THAN_OR_EQUAL = 0;
-    QUERY_OPERATOR_LATEST = 1;
+enum QueryStop {
+    QUERY_STOP_LATEST = 0;
+    QUERY_STOP_EXACT = 1;
 }
 
-message QueryParameter {
-    
-    oneof parameter {
-        int64 version = 1;
-        google.protobuf.Timestamp natural_timestamp = 2;
-    }
+message Query {
+    int64 start_sorting_key = 1;
+    int64 stop_sorting_key = 2;
 
+    QueryStop stop = 3;
 }
