@@ -5,10 +5,10 @@ package flipbook.v1;
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/empty.proto";
-import "api/v1/channel.proto";
+import "api/v1/subscription.proto";
+import "api/v1/event.proto";
 
 service EventBus {
-    rpc Open(flipbook.v1.Channel.OpenRequest) returns(flipbook.v1.Channel) {}
-    rpc Close(flipbook.v1.Channel.CloseRequest) returns(google.protobuf.Empty) {}
-    rpc SyncRequest(stream flipbook.v1.Channel.SyncRequest) returns(stream flipbook.v1.Channel) {}
+    rpc Open(flipbook.v1.Subscription.OpenRequest) returns(flipbook.v1.Subscription) {}
+    rpc Close(flipbook.v1.Subscription.CloseRequest) returns(flipbook.v1.Subscription) {}
 }

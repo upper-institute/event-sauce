@@ -2,62 +2,80 @@ package flipbook
 
 import (
 	"fmt"
-	"log"
-	"net"
 	"os"
 
+	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	grpc_zap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/upper-institute/flipbook/internal"
 	"github.com/upper-institute/flipbook/internal/helpers"
+	"github.com/upper-institute/flipbook/internal/logging"
+	"github.com/upper-institute/flipbook/internal/server"
 	flipbookv1 "github.com/upper-institute/flipbook/proto/api/v1"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
 const (
 	rootCmdUse = "flipbook"
-
-	grpcAddress_flag = "grpc.address"
 )
 
 var (
 	cfgFile string
 
-	server   *grpc.Server
 	flagCont helpers.FlagController
 
 	rootCmd = &cobra.Command{
 		Use:   rootCmdUse,
-		Short: "flipbook - Snapshot store",
+		Short: "flipbook - Event store controller",
 		Run: func(cmd *cobra.Command, args []string) {
 
-			addr := viper.GetString(grpcAddress_flag)
+			logging.Load(flagCont)
 
-			lis, err := net.Listen("tcp", addr)
-			if err != nil {
-				log.Fatalln("failed to listen to store address", addr, "because", err)
+			defer logging.Flush()
+
+			log := logging.Logger.Named("RootCmd").Sugar()
+
+			listener := server.CreateListener(flagCont)
+
+			opts := []grpc.ServerOption{
+				grpc.StreamInterceptor(
+					grpc_middleware.ChainStreamServer(
+						otelgrpc.StreamServerInterceptor(),
+						grpc_zap.StreamServerInterceptor(logging.Logger.Named("GrpcServer")),
+					),
+				),
+				grpc.UnaryInterceptor(
+					grpc_middleware.ChainUnaryServer(
+						otelgrpc.UnaryServerInterceptor(),
+						grpc_zap.UnaryServerInterceptor(logging.Logger.Named("GrpcServer")),
+					),
+				),
 			}
 
-			server = grpc.NewServer()
+			grpcServer := grpc.NewServer(opts...)
 
 			storeAdapter := internal.GetStoreAdapter(flagCont)
 
 			storeDriver, err := storeAdapter.New(flagCont)
 			if err != nil {
-
+				log.Fatalw("Failed to instantiate store driver", "error", err)
 			}
+
+			defer storeAdapter.Destroy(storeDriver)
 
 			store := internal.NewEventStore(storeDriver)
 
-			flipbookv1.RegisterEventStoreServer(server, store)
+			flipbookv1.RegisterEventStoreServer(grpcServer, store)
 
-			reflection.Register(server)
+			reflection.Register(grpcServer)
 
-			log.Println("Server listening at:", lis.Addr())
+			log.Infow("Server listening", "address", listener.Addr())
 
-			if err := server.Serve(lis); err != nil {
-				log.Fatalln("Failed to serve because", err)
+			if err := grpcServer.Serve(listener); err != nil {
+				log.Fatalw("Failed to serve gRPC server", "error", err)
 			}
 
 		},
@@ -78,9 +96,9 @@ func init() {
 
 	flagCont = helpers.NewFlagController(viper.GetViper(), rootCmd.PersistentFlags())
 
-	flagCont.BindString(grpcAddress_flag, "0.0.0.0:6333", "Bind address for gRPC server listener")
-
 	internal.BindWellKnownDrivers(flagCont)
+	logging.BindOptions(flagCont)
+	server.BindOptions(flagCont)
 
 }
 

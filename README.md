@@ -18,11 +18,12 @@ Flipbook is an event sourcing platform focusing on abstracting event storage, re
 - [x] Postgres
 - [x] AWS DynamoDB
 - [x] Redis
-- [ ] Input Validation
-- [ ] Logging
-- [ ] gRPC Server Instrumentation (middlewares for observability and tls)
+- [x] Input Validation
+- [x] Logging
+- [x] gRPC Server Instrumentation (middlewares for observability and tls)
 - [ ] EventBus
 - [ ] Tests & Benchmarks
+  - go test ./test/functional
 - [ ] Golang Event Sourcing SDK
 - [ ] Typescript Event Sourcing SDK
 

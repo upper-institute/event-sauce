@@ -11,62 +11,23 @@ import (
 	"github.com/upper-institute/flipbook/internal/exceptions"
 	"github.com/upper-institute/flipbook/internal/helpers"
 	flipbookv1 "github.com/upper-institute/flipbook/proto/api/v1"
+	"go.uber.org/zap"
 )
 
 type awsDynamodbStore struct {
 	dynamo           *dynamodb.Client
 	tableName        *string
 	defaultBatchSize int64
+	log              *zap.SugaredLogger
 }
 
 func (d *awsDynamodbStore) Write(ctx context.Context, req *flipbookv1.Event_AppendRequest, sem helpers.SortedEventMap) error {
 
 	putItens := []types.TransactWriteItem{}
-	updateItens := []types.TransactWriteItem{}
 
 	for partKey, evs := range sem {
 
-		firstEv := evs[0]
-		lastEv := evs[len(evs)-1]
-
-		updateExpr := expression.Set(
-			expression.Name(lastSortingKey_field),
-			expression.Value(marshalSortingKey(lastEv.SortingKey)),
-		)
-
-		exprBuilder := expression.NewBuilder()
-
-		if firstEv.SortingKeyType == flipbookv1.SortingKeyType_SORTING_KEY_INCREASING_SEQUENCE {
-
-			condExpr := expression.Equal(
-				expression.Name(lastSortingKey_field),
-				expression.Value(marshalSortingKey(firstEv.SortingKey-1)),
-			)
-
-			exprBuilder = exprBuilder.WithCondition(condExpr)
-
-		}
-
-		expr, err := exprBuilder.
-			WithUpdate(updateExpr).
-			Build()
-		if err != nil {
-			return err
-		}
-
-		updateItens = append(updateItens, types.TransactWriteItem{
-			Update: &types.Update{
-				TableName: d.tableName,
-				Key: map[string]types.AttributeValue{
-					partitionKey_field: marshalPartitionKey(partKey),
-					sortingKey_field:   marshalSortingKey(metaSortingKey_value),
-				},
-				UpdateExpression:          expr.Update(),
-				ConditionExpression:       expr.Condition(),
-				ExpressionAttributeNames:  expr.Names(),
-				ExpressionAttributeValues: expr.Values(),
-			},
-		})
+		log := d.log.With("partition_key", partKey)
 
 		for _, ev := range evs {
 
@@ -79,18 +40,65 @@ func (d *awsDynamodbStore) Write(ctx context.Context, req *flipbookv1.Event_Appe
 
 		}
 
+		firstEv := evs[0]
+		lastEv := evs[len(evs)-1]
+
+		log.Debugw("Inserting events", "sorting_key_type", firstEv.SortingKeyType.String(), "first_event_sorting_key", firstEv.SortingKey)
+
+		exprBuilder := expression.NewBuilder()
+
+		if firstEv.SortingKeyType == flipbookv1.SortingKeyType_SORTING_KEY_INCREASING_SEQUENCE {
+
+			if firstEv.SortingKey == 0 {
+				exprBuilder = exprBuilder.WithCondition(expression.AttributeNotExists(
+					expression.Name(partitionKey_field),
+				))
+			} else {
+				exprBuilder = exprBuilder.WithCondition(expression.Equal(
+					expression.Name(lastSortingKey_field),
+					expression.Value(marshalSortingKey(firstEv.SortingKey-1)),
+				))
+			}
+
+		}
+
+		expr, err := exprBuilder.Build()
+		if err != nil {
+			return err
+		}
+
+		putItens = append(putItens, types.TransactWriteItem{
+			Put: &types.Put{
+				TableName: d.tableName,
+				Item: map[string]types.AttributeValue{
+					partitionKey_field:   marshalPartitionKey(partKey),
+					sortingKey_field:     marshalSortingKey(metaSortingKey_value),
+					lastSortingKey_field: marshalSortingKey(lastEv.SortingKey),
+				},
+				ConditionExpression:       expr.Condition(),
+				ExpressionAttributeNames:  expr.Names(),
+				ExpressionAttributeValues: expr.Values(),
+			},
+		})
+
 	}
 
 	_, err := d.dynamo.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
-		TransactItems: append(putItens, updateItens...),
+		TransactItems: putItens,
 	})
 
 	if err != nil {
 
-		dynamoErr := &types.ConditionalCheckFailedException{}
+		txErr := &types.TransactionCanceledException{}
 
-		if errors.As(err, dynamoErr) {
-			return exceptions.ThrowOptimisticLockFailedErr()
+		if errors.As(err, &txErr) {
+
+			reason := txErr.CancellationReasons[len(txErr.CancellationReasons)-1]
+
+			if aws.ToString(reason.Code) == "ConditionalCheckFailed" {
+				return exceptions.ThrowOptimisticLockFailedErr()
+			}
+
 		}
 
 		return err
@@ -103,6 +111,8 @@ func (d *awsDynamodbStore) Write(ctx context.Context, req *flipbookv1.Event_Appe
 
 func (d *awsDynamodbStore) Read(ctx context.Context, req *flipbookv1.Event_IterateRequest, evCh chan *flipbookv1.Event) error {
 
+	d.log.Debug("Starting read loop")
+
 	batchSize := req.BatchSize
 
 	if batchSize <= 0 {
@@ -110,7 +120,7 @@ func (d *awsDynamodbStore) Read(ctx context.Context, req *flipbookv1.Event_Itera
 	}
 
 	partKey := req.PartitionKey
-	startSortKey := req.Query.StartSortingKey
+	startSortKey := req.Query.StartSortingKey - 1
 
 	projEx := expression.NamesList(
 		expression.Name(sortingKey_field),
@@ -123,20 +133,24 @@ func (d *awsDynamodbStore) Read(ctx context.Context, req *flipbookv1.Event_Itera
 
 		keyEx := expression.Key(partitionKey_field).Equal(expression.Value(partKey))
 
+		d.log.Debug("Starting pagination loop")
+
 		switch req.Query.Stop {
 
 		case flipbookv1.QueryStop_QUERY_STOP_EXACT:
-			keyEx = keyEx.And(expression.KeyBetween(
+			keyEx = keyEx.And(expression.KeyLessThanEqual(
 				expression.Key(sortingKey_field),
-				expression.Value(startSortKey),
 				expression.Value(req.Query.StopSortingKey),
 			))
 
 		case flipbookv1.QueryStop_QUERY_STOP_LATEST:
-			keyEx = keyEx.And(expression.KeyGreaterThanEqual(
-				expression.Key(sortingKey_field),
-				expression.Value(startSortKey),
-			))
+			if exclusiveStartKey == nil {
+				exclusiveStartKey = map[string]types.AttributeValue{
+					partitionKey_field: marshalPartitionKey(partKey),
+					sortingKey_field:   marshalSortingKey(startSortKey),
+				}
+			}
+
 		}
 
 		expr, err := expression.NewBuilder().
@@ -147,7 +161,10 @@ func (d *awsDynamodbStore) Read(ctx context.Context, req *flipbookv1.Event_Itera
 			return err
 		}
 
-		queryRes, err := d.dynamo.Query(ctx, &dynamodb.QueryInput{
+		d.log.Debug("Send DynamoDB query")
+
+		q := &dynamodb.QueryInput{
+			TableName:                 d.tableName,
 			ProjectionExpression:      expr.Projection(),
 			ConsistentRead:            aws.Bool(false),
 			KeyConditionExpression:    expr.KeyCondition(),
@@ -156,25 +173,46 @@ func (d *awsDynamodbStore) Read(ctx context.Context, req *flipbookv1.Event_Itera
 			ExpressionAttributeValues: expr.Values(),
 			Limit:                     aws.Int32(int32(batchSize)),
 			ScanIndexForward:          aws.Bool(true),
-		})
+		}
+
+		queryRes, err := d.dynamo.Query(ctx, q)
 		if err != nil {
 			return err
 		}
 
+		d.log.Debug("DynamoDB query executed")
+
 		if len(queryRes.Items) == 0 {
+			d.log.Debugw(
+				"DynamoDB query returned empty items list",
+				"key_condition_expression", *q.KeyConditionExpression,
+				"exclusive_start_key", exclusiveStartKey,
+				"limit", *q.Limit,
+			)
 			break
 		}
 
 		for _, attrs := range queryRes.Items {
 
+			d.log.Debug("New item decoded")
+
 			ev := unmarshalEvent(attrs)
 
 			ev.PartitionKey = partKey
 
-			startSortKey = ev.SortingKey + 1
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case evCh <- ev:
+				continue
+			}
 
-			evCh <- ev
+		}
 
+		d.log.Debugw("Last evaluated key", "last_evaluated_key", queryRes.LastEvaluatedKey)
+
+		if queryRes.LastEvaluatedKey == nil {
+			break
 		}
 
 		exclusiveStartKey = queryRes.LastEvaluatedKey

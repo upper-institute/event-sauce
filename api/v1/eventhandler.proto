@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package flipbook.v1;
+
+import "api/v1/subscription.proto";
+import "api/v1/event.proto";
+
+service EventHandler {
+    rpc Handle(stream flipbook.v1.Event) returns(stream flipbook.v1.Commit) {}
+}

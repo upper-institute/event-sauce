@@ -7,6 +7,7 @@ import (
 	"github.com/upper-institute/flipbook/internal/exceptions"
 	"github.com/upper-institute/flipbook/internal/helpers"
 	flipbookv1 "github.com/upper-institute/flipbook/proto/api/v1"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -14,6 +15,7 @@ import (
 type redisStore struct {
 	redis            redis.UniversalClient
 	defaultBatchSize int64
+	log              *zap.SugaredLogger
 }
 
 func (r *redisStore) Write(ctx context.Context, req *flipbookv1.Event_AppendRequest, sem helpers.SortedEventMap) error {
@@ -22,7 +24,11 @@ func (r *redisStore) Write(ctx context.Context, req *flipbookv1.Event_AppendRequ
 
 		for partKey, evs := range sem {
 
+			log := r.log.With("partition_key", partKey)
+
 			firstEv := evs[0]
+
+			log.Debugw("Inserting events", "sorting_key_type", firstEv.SortingKeyType.String(), "first_event_sorting_key", firstEv.SortingKey)
 
 			if firstEv.SortingKeyType == flipbookv1.SortingKeyType_SORTING_KEY_INCREASING_SEQUENCE {
 
@@ -30,7 +36,7 @@ func (r *redisStore) Write(ctx context.Context, req *flipbookv1.Event_AppendRequ
 
 				switch {
 				case err == redis.Nil:
-					hGetRes = "0"
+					hGetRes = "-1"
 				case err != nil:
 					return err
 				}
@@ -58,11 +64,6 @@ func (r *redisStore) Write(ctx context.Context, req *flipbookv1.Event_AppendRequ
 
 				for i, ev := range evs {
 
-					raw, err := proto.Marshal(ev)
-					if err != nil {
-						panic(err)
-					}
-
 					sortKey := marshalInt64(ev.SortingKey)
 
 					zAddArgs.Members = append(zAddArgs.Members, redis.Z{
@@ -70,9 +71,19 @@ func (r *redisStore) Write(ctx context.Context, req *flipbookv1.Event_AppendRequ
 						Member: sortKey,
 					})
 
-					hSetVals = append(hSetVals, sortKey, ev.EventPayload)
+					evPayload, err := proto.Marshal(ev.EventPayload)
+					if err != nil {
+						panic(err)
+					}
+
+					hSetVals = append(hSetVals, sortKey, evPayload)
 
 					if i == len(evs)-1 {
+
+						raw, err := proto.Marshal(ev)
+						if err != nil {
+							panic(err)
+						}
 
 						hSetVals = append(
 							hSetVals,
@@ -107,7 +118,7 @@ func (r *redisStore) Write(ctx context.Context, req *flipbookv1.Event_AppendRequ
 func (r *redisStore) Read(ctx context.Context, req *flipbookv1.Event_IterateRequest, evCh chan *flipbookv1.Event) error {
 
 	zRangeArgs := redis.ZRangeArgs{
-		Key:     req.PartitionKey,
+		Key:     marshalSortedSetKey(req.PartitionKey),
 		ByScore: true,
 		Count:   req.BatchSize,
 		Start:   req.Query.StartSortingKey,
@@ -138,14 +149,22 @@ func (r *redisStore) Read(ctx context.Context, req *flipbookv1.Event_IterateRequ
 			break
 		}
 
+		r.log.Debugw("HMGet partition keys", "partition_key", req.PartitionKey, "sort_keys", sortKeys)
+
 		evPayloads, err := r.redis.HMGet(ctx, req.PartitionKey, sortKeys...).Result()
 		if err != nil {
 			return err
 		}
 
-		for i, sortKey := range sortKeys {
+		if len(evPayloads) == 0 {
+			break
+		}
 
-			evPayload := evPayloads[i].([]byte)
+		for i, pld := range evPayloads {
+
+			evPayload := []byte(pld.(string))
+
+			sortKey := sortKeys[i]
 
 			ev := &flipbookv1.Event{
 				PartitionKey: req.PartitionKey,
@@ -153,12 +172,19 @@ func (r *redisStore) Read(ctx context.Context, req *flipbookv1.Event_IterateRequ
 				EventPayload: &anypb.Any{},
 			}
 
+			zRangeArgs.Start = ev.SortingKey + 1
+
 			err = proto.Unmarshal(evPayload, ev.EventPayload)
 			if err != nil {
 				panic(err)
 			}
 
-			evCh <- ev
+			select {
+			case evCh <- ev:
+				continue
+			case <-ctx.Done():
+				return ctx.Err()
+			}
 
 		}
 

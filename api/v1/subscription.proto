@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package flipbook.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+import "api/v1/endpoint.proto";
+
+enum SubscriptionStatus {
+    SUBSCRIPTION_STATUS_IDLE = 0;
+    SUBSCRIPTION_STATUS_ACTIVE = 1;
+}
+
+message Subscription {
+
+    string subscription_id = 1;
+    flipbook.v1.Endpoint event_handler = 2;
+    double estimated_consistency_level = 3;
+    SubscriptionStatus status = 4;
+    google.protobuf.Timestamp updated_at = 5;
+
+    message OpenRequest {
+        string subscription_id = 1;
+        flipbook.v1.Endpoint event_handler = 2;
+        google.protobuf.Duration push_interval = 3;
+    }
+
+    message CloseRequest {
+        string subscription_id = 1;
+    }
+
+}

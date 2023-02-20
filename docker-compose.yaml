@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+
+  dynamodb:
+    image: amazon/dynamodb-local
+    command:
+      - -jar
+      - DynamoDBLocal.jar
+      - -sharedDb
+      - -inMemory
+      - -port
+      - '8000'
+    restart: always
+    ports:
+      - '8000:8000'
+    networks:
+      - flipbook-network
+
+  flipbook-ui:
+    image: fullstorydev/grpcui
+    restart: always
+    entrypoint:
+      - /bin/grpcui
+    command:
+      - -plaintext
+      - -use-reflection
+      - -vv
+      - -port
+      - '6334'
+      - -bind
+      - '0.0.0.0'
+      - -debug-client
+      - -open-browser=false
+      - flipbook:6333
+    ports:
+      - '6334:6334'
+    depends_on:
+      - flipbook
+    networks:
+      - flipbook-network
+
+  # redis:
+  #   image: redis:7-bullseye
+
+  flipbook:
+    image: flipbook:local
+    restart: always
+    depends_on:
+      - dynamodb
+    environment:
+      - AWS_ACCESS_KEY_ID=dummy
+      - AWS_SECRET_ACCESS_KEY=dummy
+    ports:
+      - '6333:6333'
+    command:
+      - start
+      - --log-env=dev
+      - --log-level=debug
+      - --server-address=0.0.0.0:6333
+      - --tls-enable=false
+      - --store-driver=aws_dynamodb
+      - --aws-dynamodb-endpoint-url=http://dynamodb:8000
+    networks:
+      - flipbook-network
+
+networks:
+  flipbook-network:
+    driver: bridge
+    name: flipbook-network

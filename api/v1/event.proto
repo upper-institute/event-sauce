@@ -27,7 +27,6 @@ message Event {
 
     SortingKeyType sorting_key_type = 4;
 
-
     message AppendRequest {
         repeated Event events = 1;
     }
@@ -42,5 +41,9 @@ message Event {
         string partition_key = 1;
     }
 
+}
 
+message Commit {
+    string partition_key = 1;
+    int64 sorting_key = 2;
 }

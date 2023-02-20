@@ -9,6 +9,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/upper-institute/flipbook/internal/drivers"
 	"github.com/upper-institute/flipbook/internal/helpers"
+	"github.com/upper-institute/flipbook/internal/logging"
 )
 
 const (
@@ -32,10 +33,14 @@ func (r *RedisStoreAdapter) Bind(binder helpers.FlagBinder) {
 
 func (r *RedisStoreAdapter) New(getter helpers.FlagGetter) (drivers.StoreDriver, error) {
 
+	log := logging.Logger.Sugar().Named("RedisDriver")
+
 	redisUrls := getter.GetStringSlice(redisUrls_flag)
 	urls := []*url.URL{}
 
 	for _, redisUrlStr := range redisUrls {
+
+		log.Debugw("Parsing redis URL", "redis_url", redisUrlStr)
 
 		redisUrl, err := url.Parse(redisUrlStr)
 		if err != nil {
@@ -54,6 +59,7 @@ func (r *RedisStoreAdapter) New(getter helpers.FlagGetter) (drivers.StoreDriver,
 
 	store := &redisStore{
 		defaultBatchSize: getter.GetInt64(batchSize_flag),
+		log:              log,
 	}
 
 	password, db, err := getPasswordAndDbFromUrl(firstUrl)
@@ -62,6 +68,9 @@ func (r *RedisStoreAdapter) New(getter helpers.FlagGetter) (drivers.StoreDriver,
 	}
 
 	if len(urls) == 1 {
+
+		log.Debugw("Connect to Redis with simple client", "host", firstUrl.Host)
+
 		store.redis = redis.NewClient(&redis.Options{
 			Addr:         firstUrl.Host,
 			Username:     firstUrl.User.Username(),
@@ -71,9 +80,10 @@ func (r *RedisStoreAdapter) New(getter helpers.FlagGetter) (drivers.StoreDriver,
 			ReadTimeout:  getter.GetDuration(readTimeout_flag),
 			WriteTimeout: getter.GetDuration(writeTimeout_flag),
 		})
-	}
 
-	if len(urls) > 1 {
+	} else if len(urls) > 1 {
+
+		log.Debugw("Connect to Redis with ring client")
 
 		addrs := make(map[string]string)
 

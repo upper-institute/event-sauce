@@ -2,13 +2,6 @@ syntax = "proto3";
 
 package flipbook.v1;
 
-import "google/protobuf/timestamp.proto";
-
-enum EndpointStatus {
-    ENDPOINT_STATUS_ACTIVE = 0;
-    ENDPOINT_STATUS_HIDLE = 1;
-}
-
 message Endpoint {
 
     enum AddressFamily {
@@ -19,8 +12,5 @@ message Endpoint {
     string address = 1;
     uint32 port = 2;
     AddressFamily address_family = 3;
-
-    EndpointStatus status = 4;
-    google.protobuf.Timestamp updated_at = 5;
 
 }

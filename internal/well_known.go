@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"fmt"
+
 	"github.com/upper-institute/flipbook/internal/drivers"
 	"github.com/upper-institute/flipbook/internal/drivers/aws_dynamodb"
 	"github.com/upper-institute/flipbook/internal/drivers/postgres"
@@ -35,7 +37,7 @@ func GetStoreAdapter(getter helpers.FlagGetter) drivers.StoreDriverAdapter {
 	adapter, ok := wellKnownStoreDrivers[storeDriver]
 
 	if !ok {
-		return nil
+		panic(fmt.Errorf("Invalid driver: %s", storeDriver))
 	}
 
 	return adapter

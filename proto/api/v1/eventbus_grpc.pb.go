@@ -11,7 +11,6 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -23,9 +22,8 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type EventBusClient interface {
-	Open(ctx context.Context, in *Channel_OpenRequest, opts ...grpc.CallOption) (*Channel, error)
-	Close(ctx context.Context, in *Channel_CloseRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	Watch(ctx context.Context, in *Channel_WatchRequest, opts ...grpc.CallOption) (EventBus_WatchClient, error)
+	Open(ctx context.Context, in *Subscription_OpenRequest, opts ...grpc.CallOption) (*Subscription, error)
+	Close(ctx context.Context, in *Subscription_CloseRequest, opts ...grpc.CallOption) (*Subscription, error)
 }
 
 type eventBusClient struct {
@@ -36,8 +34,8 @@ func NewEventBusClient(cc grpc.ClientConnInterface) EventBusClient {
 	return &eventBusClient{cc}
 }
 
-func (c *eventBusClient) Open(ctx context.Context, in *Channel_OpenRequest, opts ...grpc.CallOption) (*Channel, error) {
-	out := new(Channel)
+func (c *eventBusClient) Open(ctx context.Context, in *Subscription_OpenRequest, opts ...grpc.CallOption) (*Subscription, error) {
+	out := new(Subscription)
 	err := c.cc.Invoke(ctx, "/flipbook.v1.EventBus/Open", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -45,8 +43,8 @@ func (c *eventBusClient) Open(ctx context.Context, in *Channel_OpenRequest, opts
 	return out, nil
 }
 
-func (c *eventBusClient) Close(ctx context.Context, in *Channel_CloseRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *eventBusClient) Close(ctx context.Context, in *Subscription_CloseRequest, opts ...grpc.CallOption) (*Subscription, error) {
+	out := new(Subscription)
 	err := c.cc.Invoke(ctx, "/flipbook.v1.EventBus/Close", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -54,45 +52,12 @@ func (c *eventBusClient) Close(ctx context.Context, in *Channel_CloseRequest, op
 	return out, nil
 }
 
-func (c *eventBusClient) Watch(ctx context.Context, in *Channel_WatchRequest, opts ...grpc.CallOption) (EventBus_WatchClient, error) {
-	stream, err := c.cc.NewStream(ctx, &EventBus_ServiceDesc.Streams[0], "/flipbook.v1.EventBus/Watch", opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &eventBusWatchClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-type EventBus_WatchClient interface {
-	Recv() (*Channel, error)
-	grpc.ClientStream
-}
-
-type eventBusWatchClient struct {
-	grpc.ClientStream
-}
-
-func (x *eventBusWatchClient) Recv() (*Channel, error) {
-	m := new(Channel)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
 // EventBusServer is the server API for EventBus service.
 // All implementations must embed UnimplementedEventBusServer
 // for forward compatibility
 type EventBusServer interface {
-	Open(context.Context, *Channel_OpenRequest) (*Channel, error)
-	Close(context.Context, *Channel_CloseRequest) (*emptypb.Empty, error)
-	Watch(*Channel_WatchRequest, EventBus_WatchServer) error
+	Open(context.Context, *Subscription_OpenRequest) (*Subscription, error)
+	Close(context.Context, *Subscription_CloseRequest) (*Subscription, error)
 	mustEmbedUnimplementedEventBusServer()
 }
 
@@ -100,14 +65,11 @@ type EventBusServer interface {
 type UnimplementedEventBusServer struct {
 }
 
-func (UnimplementedEventBusServer) Open(context.Context, *Channel_OpenRequest) (*Channel, error) {
+func (UnimplementedEventBusServer) Open(context.Context, *Subscription_OpenRequest) (*Subscription, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Open not implemented")
 }
-func (UnimplementedEventBusServer) Close(context.Context, *Channel_CloseRequest) (*emptypb.Empty, error) {
+func (UnimplementedEventBusServer) Close(context.Context, *Subscription_CloseRequest) (*Subscription, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Close not implemented")
-}
-func (UnimplementedEventBusServer) Watch(*Channel_WatchRequest, EventBus_WatchServer) error {
-	return status.Errorf(codes.Unimplemented, "method Watch not implemented")
 }
 func (UnimplementedEventBusServer) mustEmbedUnimplementedEventBusServer() {}
 
@@ -123,7 +85,7 @@ func RegisterEventBusServer(s grpc.ServiceRegistrar, srv EventBusServer) {
 }
 
 func _EventBus_Open_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Channel_OpenRequest)
+	in := new(Subscription_OpenRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -135,13 +97,13 @@ func _EventBus_Open_Handler(srv interface{}, ctx context.Context, dec func(inter
 		FullMethod: "/flipbook.v1.EventBus/Open",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EventBusServer).Open(ctx, req.(*Channel_OpenRequest))
+		return srv.(EventBusServer).Open(ctx, req.(*Subscription_OpenRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _EventBus_Close_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Channel_CloseRequest)
+	in := new(Subscription_CloseRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -153,30 +115,9 @@ func _EventBus_Close_Handler(srv interface{}, ctx context.Context, dec func(inte
 		FullMethod: "/flipbook.v1.EventBus/Close",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EventBusServer).Close(ctx, req.(*Channel_CloseRequest))
+		return srv.(EventBusServer).Close(ctx, req.(*Subscription_CloseRequest))
 	}
 	return interceptor(ctx, in, info, handler)
-}
-
-func _EventBus_Watch_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(Channel_WatchRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(EventBusServer).Watch(m, &eventBusWatchServer{stream})
-}
-
-type EventBus_WatchServer interface {
-	Send(*Channel) error
-	grpc.ServerStream
-}
-
-type eventBusWatchServer struct {
-	grpc.ServerStream
-}
-
-func (x *eventBusWatchServer) Send(m *Channel) error {
-	return x.ServerStream.SendMsg(m)
 }
 
 // EventBus_ServiceDesc is the grpc.ServiceDesc for EventBus service.
@@ -195,12 +136,6 @@ var EventBus_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _EventBus_Close_Handler,
 		},
 	},
-	Streams: []grpc.StreamDesc{
-		{
-			StreamName:    "Watch",
-			Handler:       _EventBus_Watch_Handler,
-			ServerStreams: true,
-		},
-	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "api/v1/eventbus.proto",
 }

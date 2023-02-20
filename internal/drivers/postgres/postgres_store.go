@@ -8,6 +8,7 @@ import (
 	"github.com/upper-institute/flipbook/internal/drivers/postgres/database"
 	"github.com/upper-institute/flipbook/internal/helpers"
 	flipbookv1 "github.com/upper-institute/flipbook/proto/api/v1"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -16,6 +17,7 @@ type postgresStore struct {
 	db               *sql.DB
 	queries          *database.Queries
 	defaultBatchSize int32
+	log              *zap.SugaredLogger
 }
 
 func (p *postgresStore) Write(ctx context.Context, req *flipbookv1.Event_AppendRequest, sem helpers.SortedEventMap) error {
@@ -31,9 +33,13 @@ func (p *postgresStore) Write(ctx context.Context, req *flipbookv1.Event_AppendR
 
 	for partKeyStr, evs := range sem {
 
+		log := p.log.With("partition_key", partKeyStr)
+
 		partKey := uuid.MustParse(partKeyStr)
 
 		firstEv := evs[0]
+
+		log.Debugw("Inserting events", "sorting_key_type", firstEv.SortingKeyType.String(), "first_event_sorting_key", firstEv.SortingKey)
 
 		for _, ev := range evs {
 
@@ -116,10 +122,15 @@ func (p *postgresStore) Read(ctx context.Context, req *flipbookv1.Event_IterateR
 
 				startSortKey = row.SortingKey + 1
 
-				evCh <- &flipbookv1.Event{
+				select {
+				case evCh <- &flipbookv1.Event{
 					PartitionKey: req.PartitionKey,
 					SortingKey:   row.SortingKey,
 					EventPayload: pld,
+				}:
+					continue
+				case <-ctx.Done():
+					return ctx.Err()
 				}
 
 			}
@@ -151,10 +162,15 @@ func (p *postgresStore) Read(ctx context.Context, req *flipbookv1.Event_IterateR
 
 				startSortKey = row.SortingKey + 1
 
-				evCh <- &flipbookv1.Event{
+				select {
+				case evCh <- &flipbookv1.Event{
 					PartitionKey: req.PartitionKey,
 					SortingKey:   row.SortingKey,
 					EventPayload: pld,
+				}:
+					continue
+				case <-ctx.Done():
+					return ctx.Err()
 				}
 
 			}

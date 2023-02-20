@@ -32,7 +32,7 @@ func unmarshalEventPayload(attrs map[string]types.AttributeValue) *anypb.Any {
 
 	evPayload := []byte{}
 
-	if err := attributevalue.Unmarshal(attrs[eventPayload_field], evPayload); err != nil {
+	if err := attributevalue.Unmarshal(attrs[eventPayload_field], &evPayload); err != nil {
 		panic(err)
 	}
 

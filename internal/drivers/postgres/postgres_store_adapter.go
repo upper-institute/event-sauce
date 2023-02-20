@@ -11,6 +11,7 @@ import (
 	"github.com/upper-institute/flipbook/internal/drivers"
 	"github.com/upper-institute/flipbook/internal/drivers/postgres/database"
 	"github.com/upper-institute/flipbook/internal/helpers"
+	"github.com/upper-institute/flipbook/internal/logging"
 )
 
 const (
@@ -30,6 +31,8 @@ func (p *PostgresStoreAdapter) Bind(binder helpers.FlagBinder) {
 }
 
 func (p *PostgresStoreAdapter) New(getter helpers.FlagGetter) (drivers.StoreDriver, error) {
+
+	log := logging.Logger.Sugar().Named("PostgresDriver")
 
 	postgresUrl, err := url.Parse(getter.GetString(postgresUrl_flag))
 	if err != nil {
@@ -78,6 +81,8 @@ func (p *PostgresStoreAdapter) New(getter helpers.FlagGetter) (drivers.StoreDriv
 		source.WriteString(sslmode)
 	}
 
+	log.Debugw("Open Postgres connection", "host", postgresUrl.Hostname())
+
 	db, err := sql.Open("postgres", source.String())
 	if err != nil {
 		return nil, err
@@ -89,6 +94,7 @@ func (p *PostgresStoreAdapter) New(getter helpers.FlagGetter) (drivers.StoreDriv
 		db:               p.db,
 		queries:          database.New(p.db),
 		defaultBatchSize: int32(getter.GetInt64(batchSize_flag)),
+		log:              log,
 	}, nil
 }
 
